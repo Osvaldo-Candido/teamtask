@@ -1,0 +1,31 @@
+import { compare, hash } from "bcrypt";
+import jwt from "jsonwebtoken";
+
+export type Payload = {
+  id: string
+  email: string
+  name: string
+}
+
+export async function hashPassword(password: string):Promise<string> {
+  return await hash(password, 10)
+} 
+
+export async function passwordVerify(password: string, oldPassword: string):Promise<boolean>{
+  return compare(password, oldPassword)
+} 
+
+export function generateToken(id: string, email: string, name: string) {
+  const payload: Payload = {
+      id,
+      email,
+      name
+  }
+  const secret = process.env.JWT_SECRET || 'codigo-secreto'
+  return  jwt.sign(payload, secret, {expiresIn: '7d'})
+} 
+
+export function verifyToken(token: string):Payload {
+  const secret = process.env.JWT_SECRET || 'codigo-secreto'
+  return jwt.verify(token, secret) as Payload
+}
