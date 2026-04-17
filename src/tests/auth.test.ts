@@ -1,7 +1,8 @@
-import {afterAll, beforeAll, describe, expect, it} from 'vitest'
 import {fastify} from 'fastify'
+import {afterAll, beforeAll, describe, expect, it} from 'vitest'
 import { prisma } from '../prisma-db.js'
-import { hashPassword } from '../auth-middleware.js'
+import { hashPassword } from '../auth.js'
+import { userRoutes } from '../routes/user.routes.js'
 import { authRoutes } from '../routes/auth.routes.js'
 
 const app = fastify({
@@ -13,26 +14,21 @@ const app = fastify({
 })
 
 app.register(authRoutes, {prefix: '/auth'})
-
-let osvaldoToken: string
-let albertinaToken: string
-let cebolaToken: string
-
-afterAll(async () => {
-  await app.ready()
+app.register(userRoutes, {prefix: '/user'})
+beforeAll(async () => {
+ await app.ready()
 
   await prisma.user.deleteMany({
     where:{email: {in: [
-      'osvaldo@test.com',
-      'albertina@test.com',
-      'cebola@test.com'
+      'owner@test.com',
+      'member@test.com'
     ]}}
   })
 
  await prisma.user.create({
     data: {
-      name: 'osvaldo',
-      email: 'osvaldo@test.com',
+      name: 'owner',
+      email: 'owner@test.com',
       password: await hashPassword('ps1234')
     }
   })
@@ -40,41 +36,45 @@ afterAll(async () => {
 
  await prisma.user.create({
     data: {
-      name: 'albertina',
-      email: 'albertina@test.com',
+      name: 'member',
+      email: 'member@test.com',
       password: await hashPassword('ps1234')
     }
   })
 
- await prisma.user.create({
-    data: {
-      name: 'cebola',
-      email: 'cebola@test.com',
-      password: await hashPassword('ps1234')
-    }
-  })
 
 })
 
-beforeAll(async() => {
+afterAll(async() => {
   await prisma.user.deleteMany({where:{email:{in:[
-     'osvaldo@test.com',
-      'albertina@test.com',
-      'cebola@test.com'
+      'owner@test.com',
+      'member@test.com'
   ]}}})
-
+  await app.close()
   await prisma.$disconnect()
-  app.close()
+
 })
 
 describe('POST auth/login testando o login da minha aplicação', async () => {
   it('deve ser possível fazer login com as credenciais correctas', async () => {
         const response = await app.inject({
         method: 'POST',
-        url: '/login',
-        body: {email: 'osvaldo@test.com', password: 'ps1234'}
+        url: '/auth/login',
+        body: {email: 'owner@test.com', password: 'ps1234'}
         })
-
+        
         expect(response.statusCode).toBe(200)
+        const body = response.json()
+        expect(body.password).toBeUndefined()
+  })
+
+  it('não deve ser possível fazer login com email errado', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/auth/login',
+        body: {email: 'ossan@test.com', password: 'ps1234'}
+      })
+
+      expect(response.statusCode).toBe(401)
   })
 })

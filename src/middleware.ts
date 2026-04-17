@@ -1,7 +1,7 @@
 import { FastifyReply, FastifyRequest } from "fastify";
-import { verifyToken } from "./auth-middleware.js";
+import { verifyToken } from "./auth.js";
 
-export function authMiddleware(request: FastifyRequest, reply: FastifyReply){
+export async function authMiddleware(request: FastifyRequest, reply: FastifyReply){
     const authHeaders = request.headers.authorization
 
     if(!authHeaders?.startsWith('Bearer ')){

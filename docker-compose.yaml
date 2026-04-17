@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: teamtask-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: docker
+      POSTGRES_DB: teamtask
+    ports:
+      - "5432:5432"
+    volumes:
+      - teamtask-pgdata:/var/lib/postgresql/data
+
+volumes:
+  teamtask-pgdata:

@@ -25,18 +25,18 @@ model User {
 model Task {
   id          String     @id @default(uuid())
   title       String
-  description String
+  description String?
   status      STATUS
   userId      String
-  worskpaceId String
+  workspaceId String
   user        User?      @relation(fields: [userId], references: [id])
-  workspace   Workspace? @relation(fields: [worskpaceId], references: [id])
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
 }
 
 model Workspace {
   id               String            @id @default(uuid())
   name             String
-  description      String
+  description      String?
   createdAt        DateTime          @default(now())
   tasks            Task[]
   workspaceMembers WorkspaceMember[]

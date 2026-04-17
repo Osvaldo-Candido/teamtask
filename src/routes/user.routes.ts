@@ -1,14 +1,14 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { prisma } from "../prisma-db.js";
 import { registerUserSchema } from "./user.schema.js";
-import { hashPassword } from "../auth-middleware.js";
-import { da } from "zod/locales";
+import { hashPassword } from "../auth.js";
 
-export async function authRoutes(app:FastifyInstance){
+export async function userRoutes(app:FastifyInstance){
   app.post('/', {
     schema:{
       tags:['User'],
       body:{
+          type: 'object',
           required: ['name', 'email', 'password'],
           properties:{
             name: {type: 'string', minLength: 1},
@@ -20,9 +20,14 @@ export async function authRoutes(app:FastifyInstance){
           201:{
             type: 'object',
             properties: {
+              safeUser:{
+              type: 'object',
+              properties: {
               name: {type: 'string'},
-              email: {type: 'string'},
-              password: {type: 'string'}
+              email: {type: 'string'}
+              }
+              }
+             
             }
           }
       }
@@ -40,12 +45,13 @@ export async function authRoutes(app:FastifyInstance){
 
     const createdUser = await prisma.user.create({
       data:{
-        ...dataUser
+       name: dataUser.name,
+       email: dataUser.email,
+       password: hashedPassword
       }
     })
 
     const {password:_, ...safeUser} = createdUser
-
-    return reply.status(200).send({user: safeUser})
+    return reply.status(201).send({safeUser})
   })
 }

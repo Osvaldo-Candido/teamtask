@@ -1,5 +1,7 @@
 import { compare, hash } from "bcrypt";
 import jwt from "jsonwebtoken";
+import { FastifyReply, FastifyRequest } from "fastify";
+import { prisma } from "./prisma-db.js";
 
 export type Payload = {
   id: string
@@ -12,7 +14,7 @@ export async function hashPassword(password: string):Promise<string> {
 } 
 
 export async function passwordVerify(password: string, oldPassword: string):Promise<boolean>{
-  return compare(password, oldPassword)
+  return await compare(password, oldPassword)
 } 
 
 export function generateToken(id: string, email: string, name: string) {
@@ -28,4 +30,15 @@ export function generateToken(id: string, email: string, name: string) {
 export function verifyToken(token: string):Payload {
   const secret = process.env.JWT_SECRET || 'codigo-secreto'
   return jwt.verify(token, secret) as Payload
+}
+
+export function requireRole(role: 'OWNER' | 'MEMBER'){
+  async (request: FastifyRequest, reply: FastifyReply) => {
+      const userId = request.user.id
+
+      const userRole = await prisma.workspaceMember.findFirst({
+
+      })
+  }
+ 
 }
