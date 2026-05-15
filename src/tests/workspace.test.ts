@@ -31,7 +31,9 @@ beforeAll(async() => {
     })
 
     await prisma.workspace.deleteMany({
-
+        where:{
+          name: 'imobil'
+        }
     })
 
     await prisma.user.create({
@@ -120,5 +122,33 @@ describe('GET /workspace', async () => {
     }) 
 
     expect(response.statusCode).toBe(401)
+  })
+
+  it('utilizador só vê os workspaces que pertence', async() => {
+    const member = await app.inject({
+      method: 'POST',
+      url: '/auth/login',
+      body: {email: 'ws-member@test.com', password: 'ps1234'}
+    })
+
+    const memberToken = member.json().token
+
+    const response = await app.inject({
+      method: 'GET',
+      url:'/workspace',
+      headers: {authorization: `Bearer ${memberToken}`}
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toHaveLength(0)
+
+    const owner = await app.inject({
+      method: 'GET',
+      url: '/workspace',
+      headers: {authorization: `Bearer ${ownerToken}`}
+    })
+
+    expect(owner.statusCode).toBe(200)
+    expect(owner.json()[0].name).toBe('imobil')
   })
 })

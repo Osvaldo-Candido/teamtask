@@ -1,8 +1,8 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { authMiddleware } from "../middleware.js";
 import { prisma } from "../prisma-db.js";
-import { paramsSchema, workspaceSchemaCreate, workspaceSchemaUpdate } from "./workspace.schema.js";
-import { requireRole } from "../auth.js";
+import { paramsInsertMemberSchema, paramsSchema, workspaceSchemaCreate, workspaceSchemaUpdate } from "./workspace.schema.js";
+
 export async function workspaceRoutes(app: FastifyInstance){
     app.post('/', {
       preHandler: [
@@ -133,9 +133,7 @@ export async function workspaceRoutes(app: FastifyInstance){
           }
 
           await prisma.workspaceMember.deleteMany({where:{
-            id: member.id,
-            workspaceId: id,
-            userId: user.id
+            workspaceId: id
           }})
 
           await prisma.workspace.delete({
@@ -207,5 +205,59 @@ export async function workspaceRoutes(app: FastifyInstance){
              // console.log(workspaces)
 
               return reply.status(200).send(workspaces)
+        })
+
+        //adicionando um member no workspace
+        app.post('/:workspaceId/members/:memberId', {
+          preHandler: [authMiddleware],
+          schema:{
+            tags:['Inserir'],
+            response:{
+              201:{
+
+              }
+            }
+          }
+        }, async (request: FastifyRequest, reply: FastifyReply) => {
+          const {workspaceId, memberId} = paramsInsertMemberSchema.parse(request.params)
+          const user = request.user
+
+          const memberShip = await prisma.workspaceMember.findFirst({
+            where:{
+              workspaceId,
+              userId: user.id
+            }
+          })
+
+          if(!memberShip){
+            return reply.status(404).send({message:'Workspace não encontrado.'})
+          }
+
+      
+          if(memberShip.role !== 'OWNER'){
+            return reply.status(403).send({message: "Apenas o Owner pode inserir membros"})
+          }
+          
+          const alreadyMember = await prisma.workspaceMember.findFirst({
+            where:{
+              workspaceId,
+              userId: memberId
+            }
+          })
+
+          if(alreadyMember){
+            return reply.status(401).send({message: 'Este usuário já pertence a este workspace'})
+          }
+
+          const createdMember = await prisma.workspaceMember.create({
+            data:{
+              userId: memberId,
+              workspaceId,
+              role: 'MEMBER'
+            }
+          })
+
+          return reply.status(201).send({createdMember})
+
         })
 }

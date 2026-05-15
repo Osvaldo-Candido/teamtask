@@ -4,6 +4,8 @@ import swaggerUi from '@fastify/swagger-ui'
 import swagger from '@fastify/swagger'
 import { workspaceRoutes } from './routes/workspace.routes.js'
 import { userRoutes } from './routes/user.routes.js'
+import { taskRoutes } from './routes/tasks.routes.js'
+import { AppError } from './errors.js'
 
 const app = fastify({
   ajv: {
@@ -36,15 +38,16 @@ await app.register(swaggerUi, {routePrefix: '/docs'})
 app.register(authRoutes, {prefix: '/auth'})
 app.register(workspaceRoutes, {prefix: '/workspace'})
 app.register(userRoutes, {prefix: '/user'})
+app.register(taskRoutes, {prefix: '/workspace/:workspaceId'})
 
 app.setErrorHandler((error: FastifyError, request, reply) => {
 
-      if(error.statusCode === 400){
-        return reply.status(400).send({message: 'Dados inválidos', details: error.message})
+      if(error instanceof AppError){
+        return reply.status(error.statusCode).send({message: 'Dados inválidos', details: error.message})
       }
 
-      if(error.statusCode){
-        return reply.status(error.statusCode).send({message: error.message})
+      if(error.statusCode === 400){
+        return reply.status(400).send({message: 'Dados inválidos', details: error.message})
       }
 
       console.log(error)

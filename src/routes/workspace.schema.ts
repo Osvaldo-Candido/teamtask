@@ -11,5 +11,14 @@ export const workspaceSchemaUpdate = z.object({
 })
 
 export const paramsSchema = z.object({
-  id: z.string().uuid()
+  id: z.string().uuid(),
+  memberId: z.string().uuid(),
+  workspaceId: z.string().uuid()
 })
+
+export const paramsInsertMemberSchema = z.object({
+  workspaceId: z.string().uuid(),
+  memberId: z.string().uuid()
+
+})
+
