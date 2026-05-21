@@ -1,11 +1,12 @@
 import {FastifyInstance, FastifyReply, FastifyRequest} from 'fastify'
 import { authMiddleware } from '../middleware.js'
 import { statusTaskSchema, taskParamasSchema, taskSchema, updateTaskSchema, workspaceParamasSchema } from './tasks.schema.js'
-import { paramsSchema } from './workspace.schema.js'
-import { prisma } from '../prisma-db.js'
-import { createTask, deleteTask, getTasks, updateStatus, updateTask } from '../services/tasks.js'
+import { PrismaTaskRepository } from '../repositories/prisma-task.repository.js'
+import { TaskService } from '../services/tasks.js'
 
 export async function taskRoutes(app: FastifyInstance){
+  const repo = new PrismaTaskRepository()
+  const service = new TaskService(repo)
     app.post('/tasks', 
       {preHandler:[authMiddleware],
       schema:{
@@ -36,12 +37,12 @@ export async function taskRoutes(app: FastifyInstance){
     },async (request:FastifyRequest, reply: FastifyReply) => {
       const {title, description, status} = taskSchema.parse(request.body)
       const {workspaceId} = workspaceParamasSchema.parse(request.params)
-      const user = request.user
+      const userId = request.user.id
 
-      const task = await createTask({
+      const task = await service.createTask({
           title,
           description,
-          userId: user.id,
+          userId,
           workspaceId: workspaceId,
           status
         })
@@ -63,7 +64,7 @@ export async function taskRoutes(app: FastifyInstance){
         const {workspaceId} = taskParamasSchema.parse(request.params)
         const userId = request.user.id
 
-        const tasks = await getTasks({workspaceId, userId})
+        const tasks = await service.getTasks(workspaceId, userId)
 
         return reply.status(200).send({tasks})
       }
@@ -86,7 +87,7 @@ export async function taskRoutes(app: FastifyInstance){
         const {workspaceId, id} = taskParamasSchema.parse(request.params)
         const userId = request.user.id
 
-          const taskUpdated = await updateTask({
+          const taskUpdated = await service.updateTask({
                 title,
                 description,
                 status,
@@ -116,7 +117,7 @@ export async function taskRoutes(app: FastifyInstance){
         const {workspaceId,id} = taskParamasSchema.parse(request.params)
         const userId = request.user.id
 
-          await deleteTask({id, workspaceId, userId})
+          await service.deleteTask({id, workspaceId, userId})
           return reply.status(200).send({message: 'Tarefa deletada com sucesso'})       
       }
     )
@@ -138,7 +139,7 @@ export async function taskRoutes(app: FastifyInstance){
         const {workspaceId,id} = taskParamasSchema.parse(request.params)
         const userId = request.user.id
 
-        const updatedStatusTask = await updateStatus({
+        const updatedStatusTask = await service.updateStatus({
           status,
           id,
           workspaceId,

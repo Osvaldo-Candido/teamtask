@@ -3,7 +3,7 @@ import z from "zod";
 export const taskSchema = z.object({
   title: z.string('O campo título é obrigatório'),
   description: z.string().optional(),
-  status: z.enum(['TODO','IN_PROGRESS','DONE']).default('IN_PROGRESS')
+  status: z.enum(['TODO','IN_PROGRESS','DONE']).default('TODO')
 })
 
 

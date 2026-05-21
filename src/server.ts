@@ -41,7 +41,7 @@ app.register(userRoutes, {prefix: '/user'})
 app.register(taskRoutes, {prefix: '/workspace/:workspaceId'})
 
 app.setErrorHandler((error: FastifyError, request, reply) => {
-
+        console.error(error) 
       if(error instanceof AppError){
         return reply.status(error.statusCode).send({message: 'Dados inválidos', details: error.message})
       }
@@ -50,7 +50,6 @@ app.setErrorHandler((error: FastifyError, request, reply) => {
         return reply.status(400).send({message: 'Dados inválidos', details: error.message})
       }
 
-      console.log(error)
       return reply.status(500).send({message: 'Erro interno no servidor!'})
     })
 app.listen({

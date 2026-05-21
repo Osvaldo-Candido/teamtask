@@ -1,8 +1,10 @@
 import { ForbidenError, NotFoundError } from "../errors.js";
 import { prisma } from "../prisma-db.js";
+import { Task } from "../prisma/client.js";
 import { STATUS } from "../prisma/enums.js";
+import { ITaskRepository } from "../repositories/task.repository.js";
 
-export interface CreateTask {
+export interface CreateTaskInput {
   title: string,
   description?: string, 
   status: STATUS, 
@@ -37,140 +39,86 @@ export interface GetTasks {
   userId: string
 }
 
-export async function createTask({title, description, status, userId, workspaceId}:CreateTask){
-    const member = await prisma.workspaceMember.findFirst({
-      where:{
-        userId,
-        workspaceId
-      }
-    })
+export class TaskService {
+  constructor(private repo:ITaskRepository){}
 
-    if(!member){
-      throw new ForbidenError('Não és membro deste workspace')
+   async createTask (data: CreateTaskInput) {
+
+      const member = await this.repo.findMember(data.userId, data.workspaceId)
+
+      if(!member){
+        throw new ForbidenError('Este usuário não pertence a este workspace')
+      }
+      
+      const task = await this.repo.createTask({
+        title: data.title,
+        description: data.description,
+        status: data.status,
+        workspaceId: data.workspaceId,
+        userId: data.userId
+      })
+
+      return task
+   }
+
+   async updateTask (data: UpdateTask) {
+    const task = await this.repo.findTask(data.id, data.workspaceId)
+
+    if(!task){
+      throw new NotFoundError('Tarefa não encontrada!')
     }
 
-    const task = await prisma.task.create({
-      data:{
-        title,
-        description,
-        userId,
-        workspaceId,
-        status
-      }
-    })
+    const isTheCreator = data.userId === task.userId
+    const membro = await this.repo.findMember(data.userId, task.workspaceId)
+    const isTheOwner = membro?.role === 'OWNER'
+
+    if(!isTheCreator && !isTheOwner){
+      throw new ForbidenError('Sem permissão para editar esta tarefa')
+    }
+
+    const taskUpdate = await this.repo.updateTask(data.id, data)
+
+    return taskUpdate
+
+   } 
+   async deleteTask (data: DeleteTask) {
+    const task = await this.repo.findTask(data.id, data.workspaceId)
+
+    if(!task){
+      throw new NotFoundError('Tarefa não encontrada!')
+    }
+
+    const isTheCreator = data.userId === task.userId
+    const membro = await this.repo.findMember(data.userId, task.workspaceId)
+    const isTheOwner = membro?.role === 'OWNER'
+
+    if(!isTheCreator && !isTheOwner){
+      throw new ForbidenError('Sem permissão para editar esta tarefa')
+    }
+
+    return await this.repo.deleteTask(data.id)
+
+   } 
+   async updateStatus (data:UpdateStatus) {
+     const task = await this.repo.findTask(data.id, data.workspaceId)
+
+    if(!task){
+      throw new NotFoundError('Tarefa não encontrada!')
+    }
+
+    const isTheCreator = data.userId === task.userId
+    const membro = await this.repo.findMember(data.userId, task.workspaceId)
+    const isTheOwner = membro?.role === 'OWNER'
+
+    if(!isTheCreator && !isTheOwner){
+      throw new ForbidenError('Sem permissão para editar esta tarefa')
+    }
+
+    const statusUpdated = await this.repo.updateTask(data.id, data)
 
     return task
-
-}
-
-export async function updateTask({title, description, status, id ,workspaceId, userId}:UpdateTask){
-  
-  const task = await prisma.task.findFirst({
-      where:{
-        id,
-        workspaceId
-      }
-  })
-
-  if(!task){
-      throw new NotFoundError()
-  }
-
-  await verifyTaskPermission(task.userId, userId, workspaceId)
-
-  const taskUpdated = await prisma.task.update({
-    data:{
-      title: title ?? task?.title,
-      description: description ?? task?.description
-    },
-    where:{
-      id
-    }
-  })
-
-  return taskUpdated
-}
-
-export async function updateStatus({status, id, workspaceId, userId}:UpdateStatus){
-    const task = await prisma.task.findFirst({
-      where:{
-        id,
-        workspaceId
-      }
-    })
-
-    if(!task){
-      throw new NotFoundError()
-    }
-     await verifyTaskPermission(task.userId, userId, workspaceId)
-
-    const statusUpdated = await prisma.task.update({
-      where:{
-        id
-      },
-      data:{
-        status
-      }
-    })
-
-    return statusUpdated
-}
-
-export async function deleteTask({id, workspaceId, userId}:DeleteTask){
-  const task = await prisma.task.findFirst({
-    where:{
-      id,
-      workspaceId
-    }
-  })
-
-    if(!task){
-      throw new NotFoundError()
-    }
-
-  await verifyTaskPermission(task.userId, userId, workspaceId)
-
-  return await prisma.task.delete({
-    where:{
-      id
-    }
-  })
-}
-
-async function verifyTaskPermission(taskUserId: string, userId: string, workspaceId: string){
-  const isTheCreator = taskUserId === userId
-
-  const isOwner = await prisma.workspaceMember.findFirst({
-    where:{
-      userId,
-      workspaceId,
-      role: 'OWNER'
-    }
-  })
-
-  if(!isTheCreator && !isOwner){
-    throw new ForbidenError() 
-  }
-}
-
-export async function getTasks({workspaceId, userId}:GetTasks){
-  const workspace = await prisma.workspace.findFirst({
-    where:{
-      id: workspaceId,
-      workspaceMembers:{
-        some:{
-          userId
-        }
-      }
-    },
-    include:{
-      tasks: true
-    }
-  })
-
-  if(!workspace){
-     throw new ForbidenError('Não és membro deste workspace')
-  }
-
-  return workspace.tasks
+   } 
+   async getTasks (workspaceId:string, userId:string) {
+      return this.repo.getTasks(workspaceId, userId)
+   }
 }

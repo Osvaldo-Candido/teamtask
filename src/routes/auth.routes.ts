@@ -2,8 +2,12 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { prisma } from "../prisma-db.js";
 import { loginSchema } from "./auth.schema.js";
 import { generateToken, passwordVerify } from "../auth.js";
+import { PrismaUserRepository } from "../repositories/prisma-user.repository.js";
+import { UserService } from "../services/user.js";
 
 export async function authRoutes(app: FastifyInstance) {
+  const repo = new PrismaUserRepository()
+  const service = new UserService(repo)
   app.post('/login', {
     schema: {
         tags: ['Auth'],
@@ -14,7 +18,7 @@ export async function authRoutes(app: FastifyInstance) {
             password: {type: 'string', minLength: 4}
           }
         },
-        response:{
+        response:{  
           200:{
               type: 'object',
               properties: {
@@ -33,21 +37,9 @@ export async function authRoutes(app: FastifyInstance) {
   }}, async (request: FastifyRequest, reply: FastifyReply) => {
         const {email, password} = loginSchema.parse(request.body)
 
-        const user = await prisma.user.findFirst({where: {email}})
-
-        if(!user){
-          return reply.status(401).send({message: 'Credenciais inválidas!'})
-        }
-
-        const passwordCompare = await passwordVerify(password, user.password)
-
-        if(!passwordCompare){
-          return reply.status(401).send({message: 'Credenciais inválidas!'})
-        }
-
-        const token = generateToken(user.id, user.email, user.name)
+        const user = await service.login(email, password)
         
-        const {password:_, ...safeData} = user
+        const {safeData, token} = user
 
         return reply.status(200).send({user: safeData, token})
         

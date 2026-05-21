@@ -22,6 +22,12 @@ export class ForbidenError extends AppError {
 
 export class ConflictError extends AppError {
   constructor(message='Conflito'){
-    super(message,404)
+    super(message,409)
+  }
+}
+
+export class Unauthorized extends AppError {
+  constructor(message='Conflito'){
+    super(message,401)
   }
 }

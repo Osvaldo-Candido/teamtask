@@ -2,8 +2,13 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { prisma } from "../prisma-db.js";
 import { registerUserSchema } from "./user.schema.js";
 import { hashPassword } from "../auth.js";
+import { PrismaUserRepository } from "../repositories/prisma-user.repository.js";
+import { UserService } from "../services/user.js";
 
 export async function userRoutes(app:FastifyInstance){
+  const repo = new PrismaUserRepository()
+  const service = new UserService(repo)
+
   app.post('/', {
     schema:{
       tags:['User'],
@@ -35,23 +40,7 @@ export async function userRoutes(app:FastifyInstance){
   },async (request: FastifyRequest, reply: FastifyReply) => {
     const dataUser = registerUserSchema.parse(request.body)
 
-    const user = await prisma.user.findFirst({where: {email: dataUser.email}})
-
-    if(user) {
-      return reply.status(409).send({message: 'Já existe um usuário registado com este email.'})
-    }
-
-    const hashedPassword = await hashPassword(dataUser.password)
-
-    const createdUser = await prisma.user.create({
-      data:{
-       name: dataUser.name,
-       email: dataUser.email,
-       password: hashedPassword
-      }
-    })
-
-    const {password:_, ...safeUser} = createdUser
+    const safeUser = await service.create(dataUser)
     return reply.status(201).send({safeUser})
   })
 }

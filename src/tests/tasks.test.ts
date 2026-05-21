@@ -5,6 +5,8 @@ import { hashPassword } from "../auth.js";
 import { authRoutes } from "../routes/auth.routes.js";
 import { taskRoutes } from "../routes/tasks.routes.js";
 import { workspaceRoutes } from "../routes/workspace.routes.js";
+import { InMemoryTaskRepository } from "../repositories/in-memory-task.repository.js";
+import { TaskService } from "../services/tasks.js";
 
 const app = fastify({
   ajv:{
@@ -150,7 +152,6 @@ describe('', async () => {
           headers:{authorization: `Bearer ${ownerToken}`},
           body:{title: 'tarefa_membro', description: 'tarefa criada por um membro', status: 'IN_PROGRESS'}
         })
-
         expect(task.statusCode).toBe(201)
     })
 
@@ -332,4 +333,43 @@ describe('', async () => {
 
       expect(taskApagada.statusCode).toBe(200)
     })
+})
+
+describe('TaskService.createTask', async () => {
+  it('deve ser possível criar tarefa', async ()=>{
+    const repo = new InMemoryTaskRepository()
+    const taskService = new TaskService(repo)
+
+    repo.addMember({
+      id: 'member-1',
+      userId: 'userId-1',
+      workspaceId: 'workspace-1',
+      role: 'MEMBER',
+      joinedAt: new Date()
+    })
+
+    const task = await taskService.createTask({
+      title: 'tarefa teste',
+      description: 'Descrição',
+      status: 'TODO',
+      userId: 'userId-1',
+      workspaceId: 'workspace-1'
+    })
+
+    expect(task.title).toBe('tarefa teste')
+    expect(task.userId).toBe('userId-1')
+  })
+
+  it('Não membro não deve ter', async () => {
+    const repo = new InMemoryTaskRepository()
+    const service = new TaskService(repo)
+
+    await expect(service.createTask({
+      title: 'tarefa teste',
+      description: 'Descrição teste',
+      status: 'TODO',
+      userId: 'user-1',
+      workspaceId: 'workspace-1'
+    })).rejects.toThrow('Este usuário não pertence a este workspace')
+  })
 })

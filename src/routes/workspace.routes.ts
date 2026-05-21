@@ -2,8 +2,15 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { authMiddleware } from "../middleware.js";
 import { prisma } from "../prisma-db.js";
 import { paramsInsertMemberSchema, paramsSchema, workspaceSchemaCreate, workspaceSchemaUpdate } from "./workspace.schema.js";
+import { WorkspaceServices } from "../services/workspaces.js";
+import { PrismaWorkspaceRepository } from '../repositories/prisma-workspace.repository.js';
+import { PrismaUserRepository } from "../repositories/prisma-user.repository.js";
 
 export async function workspaceRoutes(app: FastifyInstance){
+  const repo = new PrismaWorkspaceRepository()
+  const userRepo = new PrismaUserRepository()
+  const service = new WorkspaceServices(repo, userRepo)
+
     app.post('/', {
       preHandler: [
         authMiddleware
@@ -36,28 +43,11 @@ export async function workspaceRoutes(app: FastifyInstance){
         }
       }}, async (request: FastifyRequest, reply: FastifyReply) => {
         const data = workspaceSchemaCreate.parse(request.body)
-        const user = request.user
+        const userId = request.user.id
 
-
-        const result = await prisma.$transaction(async (tx) => {
-            const workspace = await tx.workspace.create({
-                data:{
-                  name: data.name,
-                  description: data.description  
-                }
-            })
-
-            const member = await tx.workspaceMember.create({
-              data:{
-                userId: user.id,
-                workspaceId: workspace.id,
-                role: 'OWNER'
-              }
-            })
-
-            return {workspace, member}
-          })
-         const {workspace, member} = result
+        const result = await service.createWorkspace(userId, data)
+       
+        const {workspace, member} = result
 
           return reply.status(201).send({workspace, member})
       })
@@ -75,31 +65,9 @@ export async function workspaceRoutes(app: FastifyInstance){
       }, async (request: FastifyRequest, reply: FastifyReply) => {
           const data = workspaceSchemaUpdate.parse(request.body)
           const {id} = paramsSchema.parse(request.params)
-          const user = request.user
+          const userId = request.user.id
 
-          const member = await prisma.workspaceMember.findFirst({
-            where:{
-              userId: user.id,
-              workspaceId: id,
-              role: 'OWNER'
-            },include:{
-              workspace: true
-            }
-          })
-
-          if(!member){
-            return reply.status(403).send({message: 'Apenas o owner pode editar o workspace'})
-          }
-
-          const workspaceUpdated = await prisma.workspace.update({
-            where:{
-              id
-            },
-            data:{
-              name: data.name || member.workspace?.name,
-              description: data.description || member.workspace?.description
-            }
-          })
+         const workspaceUpdated = await service.updateWorkspace(id, userId, data)
 
           return reply.status(200).send({workspaceUpdated})
       })
@@ -118,29 +86,9 @@ export async function workspaceRoutes(app: FastifyInstance){
         }},  
         async(request:FastifyRequest, reply:FastifyReply)=>{
           const {id} = paramsSchema.parse(request.params)
-          const user = request.user
-
-          const member = await prisma.workspaceMember.findFirst({
-            where:{
-              workspaceId: id,
-              userId: user.id,
-              role: 'OWNER'
-            }
-          })
-
-          if(!member){
-            return reply.status(403).send({message:'Apenas Owner pode eliminar workspace.'})
-          }
-
-          await prisma.workspaceMember.deleteMany({where:{
-            workspaceId: id
-          }})
-
-          await prisma.workspace.delete({
-            where:{
-              id
-            }
-          })
+          const userId = request.user.id
+          
+          await service.deleteWorkspace(userId, id)
 
           return reply.status(200).send({message:'Workspace eliminado com sucesso.'})
       })
@@ -148,24 +96,9 @@ export async function workspaceRoutes(app: FastifyInstance){
       app.get('/:id',{preHandler:[authMiddleware], schema:{}}, 
         async (request: FastifyRequest, reply: FastifyReply) =>{
           const {id} = paramsSchema.parse(request.params)
-          const user = request.user
-
-          const member = await prisma.workspaceMember.findFirst({
-            where:{
-              workspaceId: id,
-              userId: user.id,
-            }
-          })
-
-          if(!member){
-            return reply.status(404).send({message: 'Workspace não encontrado'})
-          }
-
-          const workspace = await prisma.workspace.findFirst({
-            where:{
-              id
-            }
-          })
+          const userId = request.user.id
+          
+          const workspace = await service.findWorkspace(userId, id)
 
           return reply.status(200).send({workspace})
         })
@@ -187,22 +120,9 @@ export async function workspaceRoutes(app: FastifyInstance){
           }
         }}, 
           async(request: FastifyRequest, reply: FastifyReply)=>{
-              const user = request.user
+              const userId = request.user.id
 
-              const member = await prisma.workspaceMember.findMany({
-                where:{
-                  userId: user.id,
-                },
-                include:{
-                  workspace: true
-                }
-              })
-
-              if(!member){
-                return reply.status(404).send({message:'Nenhum workspace encontrado.'})
-              }
-              const workspaces = member.map(m=>m.workspace)
-             // console.log(workspaces)
+              const workspaces = await service.getWorkspaces(userId)
 
               return reply.status(200).send(workspaces)
         })
@@ -220,43 +140,10 @@ export async function workspaceRoutes(app: FastifyInstance){
           }
         }, async (request: FastifyRequest, reply: FastifyReply) => {
           const {workspaceId, memberId} = paramsInsertMemberSchema.parse(request.params)
-          const user = request.user
+          const userId = request.user.id
 
-          const memberShip = await prisma.workspaceMember.findFirst({
-            where:{
-              workspaceId,
-              userId: user.id
-            }
-          })
-
-          if(!memberShip){
-            return reply.status(404).send({message:'Workspace não encontrado.'})
-          }
-
-      
-          if(memberShip.role !== 'OWNER'){
-            return reply.status(403).send({message: "Apenas o Owner pode inserir membros"})
-          }
+          const createdMember = await service.insertMember(userId, memberId, workspaceId)
           
-          const alreadyMember = await prisma.workspaceMember.findFirst({
-            where:{
-              workspaceId,
-              userId: memberId
-            }
-          })
-
-          if(alreadyMember){
-            return reply.status(401).send({message: 'Este usuário já pertence a este workspace'})
-          }
-
-          const createdMember = await prisma.workspaceMember.create({
-            data:{
-              userId: memberId,
-              workspaceId,
-              role: 'MEMBER'
-            }
-          })
-
           return reply.status(201).send({createdMember})
 
         })
