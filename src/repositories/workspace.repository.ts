@@ -3,7 +3,7 @@ import { CreateWorkspace, WorkspaceCreateResponse } from "../services/workspaces
 
 export interface IWorkspaceRepository {
   createWorkspace(userId:string, data: CreateWorkspace):Promise<WorkspaceCreateResponse>
-  updateWorkspace(workspaceId:string, data: Partial<Workspace>):Promise<Workspace>
+  updateWorkspace(workspaceId:string, data: Partial<Workspace>):Promise<Workspace | null>
   deleteWorkspace(workspaceId:string):Promise<void>
   findWorkspace(workspaceId:string):Promise<Workspace | null>
   getWorkspace(userId:string):Promise<Workspace[] | null>
